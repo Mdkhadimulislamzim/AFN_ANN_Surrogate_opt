@@ -16,6 +16,7 @@ sys.path.append('.')
 sys.path.append(os.path.join(os.path.dirname(__file__), 'data'))
 
 from afn.afn_core import AFNCore
+from afn.cmaes_variants import AFN_CMA
 from afn.comparison_algorithms import GA, PSO, ACO
 from data.sample import load_bbob_function
 from utils.metrics import MetricsCalculator
@@ -110,27 +111,29 @@ class AFNHansenBajerComparison:
     """Comparison between AFN, Hansen CMA-ES, and Bajer GP-EI"""
     
     def __init__(self, test_functions: List[int], dimensions: List[int], 
-                 n_runs: int, max_evaluations: int, save_dir: str, target_precision: float = 1e-8):
+                 n_runs: int, max_evaluations: int, save_dir: str, 
+                 target_precision: float = 1e-8, model_type: str = "random_forest"):
         self.test_functions = test_functions
         self.dimensions = dimensions
         self.n_runs = n_runs
         self.max_evaluations = max_evaluations
         self.target_precision = target_precision
         self.save_dir = save_dir
+        self.model_type = model_type
         self.output_dir = os.path.join(save_dir, f"afn_hansen_bajer_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         os.makedirs(self.output_dir, exist_ok=True)
         
         # Algorithms to compare
-        self.algorithms = ["AFN", "Hansen", "Bajer"]
+        self.algorithms = ["AFN-CMA-ES", "Hansen", "Bajer"]
         if not HANSEN_BAJER_AVAILABLE:
-            self.algorithms = ["AFN"]
-            print("Warning: Only AFN will be tested due to missing dependencies")
+            self.algorithms = ["AFN-CMA-ES"]
+            print("Warning: Only AFN-CMA-ES will be tested due to missing dependencies")
         
         # Initialize metrics calculator
         self.metrics_calculator = MetricsCalculator(max_evaluations)
         
-        # Initialize plotter
-        self.plotter = ComparisonPlotter(self.output_dir)
+        # Initialize plotter with correct algorithm list
+        self.plotter = ComparisonPlotter(self.output_dir, algorithms=self.algorithms)
         
         # Results storage
         self.results = {}
@@ -177,7 +180,8 @@ class AFNHansenBajerComparison:
                     batch_size=8,
                     max_evaluations=self.max_evaluations,
                     convergence_threshold=1e-6,
-                    convergence_window=10
+                    convergence_window=10,
+                    model_type=self.model_type
                 )
                 result = algorithm.optimize(objective_function, verbose=False)
                 
@@ -186,8 +190,27 @@ class AFNHansenBajerComparison:
                     'best_y': result['best_y'],
                     'history': result['y_history'],
                     'evaluations': result['evaluation_count'],
-                    'time': time.time() - start_time,
+                    'execution_time': time.time() - start_time,
                     'converged': result['converged'],
+                    'optimum': optimum
+                }
+            
+            elif algorithm_name == "AFN-CMA-ES":
+                algorithm = AFN_CMA(
+                    bounds=bounds,
+                    max_evaluations=self.max_evaluations,
+                    model_type=self.model_type,
+                    random_state=seed
+                )
+                result = algorithm.optimize(objective_function, verbose=False)
+                
+                return {
+                    'best_x': result['best_x'],
+                    'best_y': result['best_y'],
+                    'history': result['y_history'] if 'y_history' in result else result['history'],
+                    'evaluations': result['evaluation_count'],
+                    'execution_time': time.time() - start_time,
+                    'converged': result.get('converged', False),
                     'optimum': optimum
                 }
                 
@@ -204,7 +227,7 @@ class AFNHansenBajerComparison:
                     'best_y': best_y,
                     'history': history,
                     'evaluations': len(history),
-                    'time': time.time() - start_time,
+                    'execution_time': time.time() - start_time,
                     'converged': False,  # CMA-ES convergence is complex
                     'optimum': optimum
                 }
@@ -222,7 +245,7 @@ class AFNHansenBajerComparison:
                     'best_y': best_y,
                     'history': history,
                     'evaluations': len(history),
-                    'time': time.time() - start_time,
+                    'execution_time': time.time() - start_time,
                     'converged': False,  # GP minimize convergence is complex
                     'optimum': optimum
                 }
@@ -234,7 +257,7 @@ class AFNHansenBajerComparison:
                 'best_y': float('inf'),
                 'history': [],
                 'evaluations': 0,
-                'time': time.time() - start_time,
+                'execution_time': time.time() - start_time,
                 'converged': False,
                 'optimum': optimum
             }
@@ -265,7 +288,7 @@ class AFNHansenBajerComparison:
         
         # Extract data
         best_values = [r['best_y'] for r in results if r['best_y'] != float('inf')]
-        exec_times = [r['time'] for r in results if r['time'] > 0]
+        exec_times = [r['execution_time'] for r in results if r.get('execution_time', 0) > 0]
         
         # Extract histories
         histories = []
@@ -292,9 +315,9 @@ class AFNHansenBajerComparison:
         
         # Use MetricsCalculator for standard metrics
         all_metrics = self.metrics_calculator.compute_all_metrics(
-            results=results,
-            target_precision=self.target_precision,
-            optimum=optimum
+            runs=results,
+            optimum=optimum,
+            target_precision=self.target_precision
         )
         
         # Basic statistics
@@ -359,7 +382,7 @@ class AFNHansenBajerComparison:
                             print(f"  [{algorithm_name} - Run {run_idx + 1}/{self.n_runs}] "
                                   f"Evaluations: {result['evaluations']} | "
                                   f"Best: {result['best_y']:.6e} | "
-                                  f"Time: {result['time']:.2f}s | "
+                                  f"Time: {result['execution_time']:.2f}s | "
                                   f"Status: {status}")
                     
                     self.results[test_key][algorithm_name] = algorithm_results
@@ -389,26 +412,72 @@ class AFNHansenBajerComparison:
 
     def save_results(self):
         """Save results to JSON files"""
+        
+        # Convert numpy arrays to lists for JSON serialization
+        def convert_for_json(obj):
+            if isinstance(obj, dict):
+                return {k: convert_for_json(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_for_json(item) for item in obj]
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            else:
+                return obj
+        
+        # Convert results
+        results_converted = convert_for_json(self.results)
+        metrics_converted = convert_for_json(self.metrics)
+        
         # Save detailed results
         with open(os.path.join(self.output_dir, "results.json"), "w") as f:
-            json.dump(self.results, f, indent=2, default=str)
+            json.dump(results_converted, f, indent=2, default=str)
+        
+        # Save detailed runs (compatible format with plotting utilities)
+        runs_data = {}
+        for test_key, alg_results in self.results.items():
+            parts = test_key.split('_')
+            func_id = parts[0].replace('f', '')
+            dim = parts[1].replace('d', '')
+            
+            for alg_name, runs in alg_results.items():
+                # Create key in format expected by plotter
+                new_key = f"func{func_id}_dim{dim}_{alg_name}"
+                runs_data[new_key] = convert_for_json(runs)
+        
+        with open(os.path.join(self.output_dir, "runs.json"), "w") as f:
+            json.dump(runs_data, f, indent=2, default=str)
         
         # Save metrics summary
         with open(os.path.join(self.output_dir, "metrics_summary.json"), "w") as f:
-            json.dump(self.metrics, f, indent=2, default=str)
+            json.dump(metrics_converted, f, indent=2, default=str)
 
     def create_comparison_plots(self):
         """Create COCO-style CDF comparison plots"""
         if not self.results:
             return
         
-        print("✓ Generating CDF plots...")
+        print("\nCreating Comparison Plots...")
         
-        # Use ComparisonPlotter to create CDF plots
+        # Convert results format from {f1_d2: {AFN: [...], Hansen: [...]}}
+        # to {func1_dim2_AFN: [...], func1_dim2_Hansen: [...]} for plotter
+        converted_results = {}
+        for test_key, alg_results in self.results.items():
+            # Parse test_key like "f1_d2" to extract function and dimension
+            parts = test_key.split('_')
+            func_id = parts[0].replace('f', '')
+            dim = parts[1].replace('d', '')
+            
+            # Convert each algorithm's results
+            for alg_name, runs in alg_results.items():
+                # Create key in format expected by plotter: "func1_dim2_AFN-CMA-ES"
+                new_key = f"func{func_id}_dim{dim}_{alg_name}"
+                converted_results[new_key] = runs
+        
+        # Use ComparisonPlotter with converted format
         # Note: Budgets must be expressed as multiples of the dimension (COCO standard)
         self.plotter.create_all_plots(
-            results=self.results,
-            target_precision=self.target_precision,
+            results=converted_results,
+            metrics_summary=self.metrics,
             optimum=0.0  # BBOB functions have optimum at 0.0
         )
         
@@ -417,15 +486,21 @@ class AFNHansenBajerComparison:
 def parse_arguments():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description='AFN vs Hansen vs Bajer Comparison on BBOB Benchmark',
+        description='AFN-CMA-ES vs Hansen vs Bajer Comparison on BBOB Benchmark',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Full benchmark (f8 and f23 from paper)
+  # Full benchmark (f8 and f23 from paper) - Random Forest (default)
   python %(prog)s --functions 8,23 --dimensions 2,5,10,20 --n_runs 30 --max_evals 10000 --verbose
+  
+  # Full benchmark with MLP Deep Ensemble
+  python %(prog)s --model_type mlp --functions 8,23 --dimensions 2,5,10,20 --n_runs 30 --max_evals 10000 --verbose
   
   # Quick test
   python %(prog)s --functions 1,8 --dimensions 2,5 --n_runs 5 --max_evals 2000 --verbose
+  
+  # Quick test with MLP
+  python %(prog)s --model_type mlp --quick
   
   # Range support
   python %(prog)s --functions 1-24 --dimensions 2,5,10,20 --n_runs 30 --verbose
@@ -441,6 +516,9 @@ Examples:
                        help='Maximum evaluations per run (default: 10000)')
     parser.add_argument('--target_precision', type=float, default=1e-8,
                        help='Target precision for success rate/ERT (default: 1e-8)')
+    parser.add_argument('--model_type', type=str, default='random_forest',
+                       choices=['random_forest', 'mlp'],
+                       help='Surrogate model type for AFN-CMA-ES (random_forest or mlp) (default: random_forest)')
     parser.add_argument('--output_dir', type=str, default='results', 
                        help='Output directory for results (default: results)')
     parser.add_argument('--verbose', action='store_true', 
@@ -453,8 +531,8 @@ Examples:
 def print_banner():
     """Print comparison banner"""
     print("=" * 80)
-    print("AFN vs Hansen vs Bajer Optimization Comparison")
-    print("Using Ensemble-based AFN with RandomForestRegressor")
+    print("AFN-CMA-ES vs Hansen vs Bajer Optimization Comparison")
+    print("AFN-CMA-ES supports Random Forest (default) or MLP Deep Ensemble")
     print("=" * 80)
 
 def main():
@@ -484,14 +562,16 @@ def main():
     print(f"║  • Runs per test: {args.n_runs:<48}║")
     print(f"║  • Max evaluations: {args.max_evals:<46}║")
     print(f"║  • Target precision: {args.target_precision:<43}║")
+    print(f"║  • Surrogate model: {args.model_type:<47}║")
     print(f"║  • Random seed: Deterministic (based on run index){' '*15}║")
     print(f"║  • Output: {args.output_dir:<54}║")
     print(f"╚{'═'*68}╝")
     
     # Calculate total runs
-    algorithms = ["AFN", "Hansen", "Bajer"] if HANSEN_BAJER_AVAILABLE else ["AFN"]
+    algorithms = ["AFN-CMA-ES", "Hansen", "Bajer"] if HANSEN_BAJER_AVAILABLE else ["AFN-CMA-ES"]
     total_runs = len(test_functions) * len(dimensions) * len(algorithms) * args.n_runs
-    print(f"\nTotal evaluations: {total_runs} runs\n")
+    print(f"\nAlgorithms: {', '.join(algorithms)}")
+    print(f"Total evaluations: {total_runs} runs\n")
     
     # Validate inputs
     if len(test_functions) == 0:
@@ -525,7 +605,8 @@ def main():
             n_runs=args.n_runs,
             max_evaluations=args.max_evals,
             save_dir=args.output_dir,
-            target_precision=args.target_precision
+            target_precision=args.target_precision,
+            model_type=args.model_type
         )
         
         # Run the comparison
