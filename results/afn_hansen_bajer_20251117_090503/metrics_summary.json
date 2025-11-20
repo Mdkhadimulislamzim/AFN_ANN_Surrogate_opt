@@ -1,0 +1,142 @@
+{
+  "f1_d2": {
+    "AFN-CMA-ES": {
+      "mean_best": 79.48045998462773,
+      "std_best": 0.0005292736959351893,
+      "mean_time": 0.7768120765686035,
+      "convergence_speed": 24.6,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 99.9993340832501,
+      "n_runs": 5
+    },
+    "Hansen": {
+      "mean_best": 79.4901049632704,
+      "std_best": 0.0074786731196663245,
+      "mean_time": 0.003511476516723633,
+      "convergence_speed": 45.0,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 99.9905916929873,
+      "n_runs": 5
+    },
+    "Bajer": {
+      "mean_best": 79.48121756766255,
+      "std_best": 0.0012261864041671806,
+      "mean_time": 14.1267596244812,
+      "convergence_speed": 9.4,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 99.99845726268207,
+      "n_runs": 5
+    }
+  },
+  "f1_d5": {
+    "AFN-CMA-ES": {
+      "mean_best": 80.83320030884366,
+      "std_best": 1.3695606824471707,
+      "mean_time": 0.5230903625488281,
+      "convergence_speed": 45.6,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 98.30569533655179,
+      "n_runs": 5
+    },
+    "Hansen": {
+      "mean_best": 83.0751702055431,
+      "std_best": 1.5973447598593966,
+      "mean_time": 0.003934288024902343,
+      "convergence_speed": 57.0,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 98.07722962720717,
+      "n_runs": 5
+    },
+    "Bajer": {
+      "mean_best": 79.48049382742451,
+      "std_best": 0.0004723704258140705,
+      "mean_time": 17.61151671409607,
+      "convergence_speed": 20.0,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 99.99940567754041,
+      "n_runs": 5
+    }
+  },
+  "f8_d2": {
+    "AFN-CMA-ES": {
+      "mean_best": 149.5232024665923,
+      "std_best": 0.5656181685103538,
+      "mean_time": 0.5464498996734619,
+      "convergence_speed": 17.8,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 99.6217187973641,
+      "n_runs": 5
+    },
+    "Hansen": {
+      "mean_best": 151.5869988296718,
+      "std_best": 2.413421424301912,
+      "mean_time": 0.003825473785400391,
+      "convergence_speed": 37.0,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 98.4078968229896,
+      "n_runs": 5
+    },
+    "Bajer": {
+      "mean_best": 149.4029747444443,
+      "std_best": 0.2094338145487537,
+      "mean_time": 14.781583786010742,
+      "convergence_speed": 9.8,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 99.8598195150351,
+      "n_runs": 5
+    }
+  },
+  "f8_d5": {
+    "AFN-CMA-ES": {
+      "mean_best": 267.1761944434931,
+      "std_best": 58.04056494078495,
+      "mean_time": 0.2049168109893799,
+      "convergence_speed": 34.2,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 78.27629626146938,
+      "n_runs": 5
+    },
+    "Hansen": {
+      "mean_best": 517.839506245796,
+      "std_best": 166.63416802579425,
+      "mean_time": 0.003947830200195313,
+      "convergence_speed": 77.0,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 67.82127164575577,
+      "n_runs": 5
+    },
+    "Bajer": {
+      "mean_best": 189.17648951744937,
+      "std_best": 20.13323472917267,
+      "mean_time": 15.224423170089722,
+      "convergence_speed": 26.8,
+      "success_rate": 0.0,
+      "ert": 100.0,
+      "resource_utilization": 100.0,
+      "robustness": 89.35743295558109,
+      "n_runs": 5
+    }
+  }
+}
